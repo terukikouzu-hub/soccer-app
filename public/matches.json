@@ -1,0 +1,7 @@
+[
+  { "id": 1, "home": "Arsenal", "away": "Liverpool", "score": "2 - 2" },
+  { "id": 2, "home": "Real Madrid", "away": "Barcelona", "score": "0 - 4" },
+  { "id": 3, "home": "Man City", "away": "Southampton", "score": "1 - 0" },
+  { "id": 4, "home": "Bayern", "away": "Dortmund", "score": "3 - 1" },
+  { "id": 5, "home": "Milan", "away": "Inter", "score": "1 - 2" }
+]
