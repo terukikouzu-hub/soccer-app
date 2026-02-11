@@ -1,5 +1,6 @@
 // src/pages/MatchList.jsx
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // ★追加: ページ遷移用
 import MatchCard from '../components/MatchCard';
 import CompetitionSelector from '../components/CompetitionSelector';
 import CompetitionModal from '../components/CompetitionModal';
@@ -16,6 +17,7 @@ const LEAGUE_TITLES = {
 };
 
 function MatchList() {
+  const navigate = useNavigate();
   const [matchGroups, setMatchGroups] = useState({});
   const [displayMatchday, setDisplayMatchday] = useState(1); // 表示中の節
   const [matchdayList, setMatchdayList] = useState([]); // 1〜38節のリスト
@@ -24,14 +26,14 @@ function MatchList() {
   // モーダルの開閉状態
   const [isMatchdaySelectorOpen, setIsMatchdaySelectorOpen] = useState(false);
   const [isLeagueSelectorOpen, setIsLeagueSelectorOpen] = useState(false);
-  // リーグ選択の状態
+    
   const [currentCompetition, setCurrentCompetition] = useState('PL');
   const [competitions, setCompetitions] = useState([]);
   const [isCompLoading, setIsCompLoading] = useState(true);
 
   // 1. 初回ロード時にリーグ一覧を取得
   useEffect(() => {
-    const API_KEY = import.meta.env.VITE_API_KEY;
+    const API_KEY = import.meta.env.VITE_FOOTBALL_DATA_ORG_KEY;
     const options = { headers: { 'X-Auth-Token': API_KEY } };
 
     fetch('/api/competitions', options)
@@ -52,7 +54,7 @@ function MatchList() {
   //2. 試合データを取得（リーグが変わるたびに実行）
   useEffect(() => {
     setIsLoading(true); // リーグが変わったらローディングを表示
-    const API_KEY = import.meta.env.VITE_API_KEY;
+    const API_KEY = import.meta.env.VITE_FOOTBALL_DATA_ORG_KEY;
     const options = { headers: { 'X-Auth-Token': API_KEY } };
 
     fetch(`/api/competitions/${currentCompetition}/matches`, options)
@@ -132,6 +134,12 @@ function MatchList() {
   const handleSelectLeague = (code) => {
     setCurrentCompetition(code);
     setIsLeagueSelectorOpen(false); // 選択したら閉じる
+  };
+
+  // 試合詳細へ遷移する関数
+  const handleMatchClick = (match) => {
+    // navigate(URL, { state: 渡したいデータ })
+    navigate(`/match/${match.id}`, { state: { matchData: match } });
   };
 
   return (
@@ -221,6 +229,7 @@ function MatchList() {
                 date={match.date} 
                 allOpen={allOpen} // 親の状態を渡す
                 status={match.status} // statusをpropsとして渡す
+                onScoreClick={() => handleMatchClick(match)}
               />
             ))}
           </div>

@@ -2,13 +2,14 @@
 
 // import { Link } from 'react-router-dom';
 import { Link } from 'react-router-dom';
+
 function TeamBadge({ teamId, teamName, teamLogo, align = 'center' }) {
-  // alignプロパティで、左寄せ・右寄せをMatchCardの左右に合わせて切り替えられるようにします
   const alignmentClass = align === 'left' ? 'items-start text-left' : align === 'right' ? 'items-end text-right' : 'items-center text-center';
 
   return (
     <Link 
       to={`/team/${teamId}`} 
+      state={{ teamData: { id: teamId, name: teamName, logo: teamLogo } }}
       className={`flex flex-col ${alignmentClass} w-full group transition-transform active:scale-95`}
     >
       {/* エンブレム：ホバー時に少し浮き上がる演出 */}
