@@ -4,7 +4,8 @@ import { Routes, Route } from 'react-router-dom';
 import MatchList from './pages/MatchList';
 import TeamDetail from './pages/TeamDetail';
 import MatchDetail from './pages/MatchDetail';
-import ApiTest from './pages/ApiTest'; // ★追加
+import ApiTestMatchList from './pages/ApiTestMatchList';
+import ApiTestMatchDetail from './pages/ApiTestMatchDetail';
 
 function App() {
   return (
@@ -15,8 +16,8 @@ function App() {
       {/* URLが「/team/ID」のときは、TeamDetail を表示 */}
       <Route path="/team/:id" element={<TeamDetail />} />
       <Route path="/match/:id" element={<MatchDetail />} />
-
-      <Route path="/test" element={<ApiTest />} />
+      <Route path="/test-list" element={<ApiTestMatchList />} />
+      <Route path="/test-detail" element={<ApiTestMatchDetail />} />
     </Routes>
   );
 }
