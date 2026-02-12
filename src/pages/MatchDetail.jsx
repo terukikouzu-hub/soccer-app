@@ -64,14 +64,14 @@ function MatchDetail() {
           const isHomeMatch = apiHome.includes(orgHome) || orgHome.includes(apiHome);
           const isAwayMatch = apiAway.includes(orgAway) || orgAway.includes(apiAway);
 
-          console.log(`比較: API[${apiHome}] vs 一覧[${orgHome}]`);
+          
 
           return isHomeMatch || isAwayMatch;
         });
 
         if (targetMatch) {
           console.log("詳細データ取得成功:", targetMatch);
-          console.log("イベントデータ:", targetMatch.events);
+          console.log("詳細データ全容:", targetMatch);
           setDetails(targetMatch);
         } else {
           setError('詳細データが見つかりませんでした');
