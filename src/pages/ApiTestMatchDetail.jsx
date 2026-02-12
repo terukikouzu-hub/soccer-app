@@ -1,24 +1,24 @@
-// src/pages/ApiTest.jsx
+// src/pages/ApiTestMatchDetail.jsx
 import { useState } from 'react';
 
-function ApiTest() {
+function ApiTestMatchDetail() {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    // テストしたい日付（過去の試合が多い日を指定）
-    const TEST_DATE = '2026-02-11';
+    // テストしたい特定の試合ID (Nottingham Forest vs Wolves)
+    const MATCH_ID = '1379225';
 
     const runTest = async () => {
         setLoading(true);
         setError(null);
 
         const API_KEY = import.meta.env.VITE_API_FOOTBALL_KEY;
-        console.log("テスト開始: APIキー", API_KEY ? "あり" : "なし");
+        console.log("テスト開始: 試合詳細取得 ID:", MATCH_ID);
 
         try {
             const response = await fetch(
-                `https://v3.football.api-sports.io/fixtures?date=${TEST_DATE}`,
+                `https://v3.football.api-sports.io/fixtures?id=${MATCH_ID}`,
                 {
                     headers: {
                         'x-rapidapi-key': API_KEY,
@@ -52,7 +52,7 @@ function ApiTest() {
                 onClick={runTest}
                 className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 font-bold mb-6"
             >
-                APIをテストする ({TEST_DATE})
+                APIをテストする (ID: {MATCH_ID})
             </button>
 
             {loading && <p className="text-gray-500">データ取得中...</p>}
@@ -78,4 +78,4 @@ function ApiTest() {
     );
 }
 
-export default ApiTest;
+export default ApiTestMatchDetail;
