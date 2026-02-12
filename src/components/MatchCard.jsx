@@ -1,6 +1,6 @@
 // src/components/MatchCard.jsx
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+//import { Link } from 'react-router-dom';
 import TeamBadge from './TeamBadge';
 
 function MatchCard({ id, homeId, homeTeam, homeLogo, awayId, awayTeam, awayLogo, score, date, allOpen, status, onScoreClick }) {
@@ -10,9 +10,17 @@ function MatchCard({ id, homeId, homeTeam, homeLogo, awayId, awayTeam, awayLogo,
     setIsIndividualOpen(allOpen);
   }, [allOpen]);
 
-  // 試合が終了しているか判定（FINISHED 以外は試合前・中とみなす）
-  const isFinished = status === 'FINISHED';
-  const isPostponed = status === 'POSTPONED';
+  // 終了: FT(Full Time), AET(延長), PEN(PK)
+  const isFinished = ['FT', 'AET', 'PEN'].includes(status);
+  
+  // 延期・中止: PST(Postponed), CANC(Cancelled), ABD(Abandoned)
+  const isPostponed = ['PST', 'CANC', 'ABD'].includes(status);
+  
+  // ライブ中: 1H(前半), HT(ハーフタイム), 2H(後半), ET(延長中), P(PK中)
+  const isLive = ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'INT'].includes(status);
+
+  // 試合前: NS(Not Started), TBD(Time to be defined)
+  const isScheduled = ['NS', 'TBD'].includes(status);
 
   const getDisplayDate = (dateString) => {
     const matchDate = new Date(dateString);
@@ -65,9 +73,24 @@ function MatchCard({ id, homeId, homeTeam, homeLogo, awayId, awayTeam, awayLogo,
                 </button>
               )}
             </>
+          ) : isLive ? (
+            /* 試合中 */
+            <div className="w-full h-8 rounded-md bg-red-50 text-red-600 border border-red-100 flex items-center justify-center gap-1">
+               <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                </span>
+                <span className="text-[11px] font-bold">試合中</span>
+            </div>
+          ) : isPostponed ? (
+            /* 延期 */
+            <div className="w-full h-8 rounded-md bg-gray-100 text-gray-400 text-[11px] font-bold border border-gray-200 flex items-center justify-center pt-[1px]">
+              延期
+            </div>
           ) : (
-            // 試合前または延期の場合
-            <div className="w-full h-8 rounded-md bg-gray-100 text-gray-400 text-[11px] font-bold border border-gray-50 flex items-center justify-center pt-[1px]">              {isPostponed ? "延期" : "試合前"}
+            /* 試合前 (NSなど) */
+            <div className="w-full h-8 rounded-md bg-gray-50 text-gray-400 text-[11px] font-bold border border-gray-100 flex items-center justify-center pt-[1px]">
+              試合前
             </div>
           )}
         </div>
