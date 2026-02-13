@@ -27,7 +27,6 @@ function TestHeader() {
 
     // 2. ヘッダーの底辺パディングを削る (24px -> 8px)
     const currentPaddingBottom = 24;
-
     const bottomNegativeMargin = progress * 40;
 
     // 3. エンブレムの変形 (縮小 & 横移動)
