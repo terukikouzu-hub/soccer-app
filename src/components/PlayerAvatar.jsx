@@ -1,3 +1,4 @@
+//PlayerAvatar.jsx
 import React, { useState } from 'react';
 
 const PlayerAvatar = ({ src, alt, size = "md", className = "" }) => {
