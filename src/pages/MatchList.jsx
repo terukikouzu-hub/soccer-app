@@ -57,21 +57,22 @@ function MatchList() {
   // アコーディオンの開閉状態管理 { leagueId: boolean }
   const [openStates, setOpenStates] = useState({});
 
-  // ★追加: リーグナビの表示状態 (デフォルトfalse = 非表示)
+  // リーグナビの表示状態 (デフォルトfalse = 非表示)
   const [isNavOpen, setIsNavOpen] = useState(false);
 
   //1. 試合データを取得（日付またはリーグが変わるたびに実行）
   useEffect(() => {
     setIsLoading(true);
     const API_KEY = import.meta.env.VITE_API_FOOTBALL_KEY;
-    // ★修正1: ローカル時間(JST)で日付文字列 "YYYY-MM-DD" を作成する
+
+    // APIリクエスト用の日付文字列 (UTCベースでもJSTベースでも、API側が解釈できる形式で送る)
     const year = currentDate.getFullYear();
     const month = String(currentDate.getMonth() + 1).padStart(2, '0');
     const day = String(currentDate.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${day}`;
 
-    // ★修正2: APIにタイムゾーンを指定する (ブラウザのタイムゾーン、または 'Asia/Tokyo')
-    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Tokyo';
+    // APIには「日本時間」を要求する
+    const userTimezone = 'Asia/Tokyo';
 
     fetch(`https://v3.football.api-sports.io/fixtures?date=${dateStr}&timezone=${userTimezone}`, {
       headers: {
@@ -90,8 +91,32 @@ function MatchList() {
             setIsLoading(false);
             return;
         }
-        // 1. データを整形
-        const formatted = data.response.map(item => ({
+
+        // ★★★ ここが最強のフィルタリングロジックです ★★★
+        // 1. ユーザーが選択している「日本時間での年月日」を取得
+        // toLocaleStringを使うことで、ブラウザの内部時間に左右されず強制的にJSTへ変換して取得
+        const targetDateJST = new Date(currentDate.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+        const targetY = targetDateJST.getFullYear();
+        const targetM = targetDateJST.getMonth();
+        const targetD = targetDateJST.getDate();
+
+        // 2. データを整形しつつフィルタリング
+        const formatted = data.response
+          .filter(item => {
+            // 試合開始時間 (UTC) を取得
+            const matchDateUTC = new Date(item.fixture.date);
+            
+            // それを「日本時間」に変換したときの日付を取得
+            const matchDateJST = new Date(matchDateUTC.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+            
+            // 年・月・日が完全に一致するかチェック
+            const isSameDay = 
+                matchDateJST.getFullYear() === targetY &&
+                matchDateJST.getMonth() === targetM &&
+                matchDateJST.getDate() === targetD;
+
+            return isSameDay;
+          }).map(item => ({
           id: item.fixture.id,
           leagueId: item.league.id,
           leagueName: item.league.name,
