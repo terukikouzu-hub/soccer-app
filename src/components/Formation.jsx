@@ -1,9 +1,10 @@
+//Formation.jsx
 import React from 'react';
 import PitchBackground from './PitchBackground';
 import FormationPlayer from './FormationPlayer';
 
 // 片側のチーム配置を担当する内部コンポーネント
-const TeamLayer = ({ lineup, playersStats, isHome }) => {
+const TeamLayer = ({ lineup, playersStats, events, isHome }) => {
   if (!lineup || !lineup.startXI) return <div className="w-full h-1/2"></div>;
 
   const { startXI } = lineup;
@@ -50,7 +51,8 @@ const TeamLayer = ({ lineup, playersStats, isHome }) => {
 
             const playerForDisplay = {
               ...lineupPlayer,
-              photo: photoUrl
+              photo: photoUrl,
+              statistics: detail?.statistics
             };
 
             return (
@@ -58,6 +60,7 @@ const TeamLayer = ({ lineup, playersStats, isHome }) => {
                 key={lineupPlayer.id} 
                 player={playerForDisplay} 
                 rating={rating}
+                events={events}
                 isHome={isHome} 
                 onClick={() => console.log("Player clicked:", lineupPlayer.name)}
               />
@@ -70,7 +73,7 @@ const TeamLayer = ({ lineup, playersStats, isHome }) => {
 };
 
 // メインコンポーネント
-function Formation({ homeLineup, awayLineup, homeStats, awayStats }) {
+function Formation({ homeLineup, awayLineup, homeStats, awayStats, events }) {
   if (!homeLineup && !awayLineup) return null;
 
   return (
@@ -90,12 +93,14 @@ function Formation({ homeLineup, awayLineup, homeStats, awayStats }) {
           <TeamLayer 
             lineup={homeLineup} 
             playersStats={homeStats} 
+            events={events}
             isHome={true} 
           />
           {/* 下半分: アウェイ */}
           <TeamLayer 
             lineup={awayLineup} 
             playersStats={awayStats} 
+            events={events}
             isHome={false} 
           />
         </div>

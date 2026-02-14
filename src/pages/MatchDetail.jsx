@@ -56,7 +56,9 @@ function MatchDetail() {
         // ID指定の場合、response配列には該当する1試合だけが入ってきます
         if (json.response && json.response.length > 0) {
           const targetMatch = json.response[0];
-          console.log("詳細データ取得成功:", targetMatch);
+          console.log("▼ API取得イベントデータ:", targetMatch.events);
+          const substEvents = targetMatch.events.filter(e => e.type === 'subst');
+          console.log("▼ 交代イベントのみ抽出:", substEvents);
           setDetails(targetMatch);
         } else {
           setError('詳細データが見つかりませんでした');
@@ -132,6 +134,7 @@ function MatchDetail() {
                         awayLineup={details.lineups[1]} 
                         homeStats={details.players?.[0]?.players}
                         awayStats={details.players?.[1]?.players}
+                        events={details.events}
                     />
                 </div>
                 )}

@@ -1,3 +1,6 @@
+germany50d15091160bb23951caf6c620830dd3
+teruki93eae9988c2f7be9fe42f4c4de26dc3c
+
 #MatchList
 ✅10MTCHS削除
 ✅節の選択をMATCHDAYの横に移動

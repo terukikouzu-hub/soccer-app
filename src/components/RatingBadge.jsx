@@ -1,3 +1,4 @@
+//RatingBadge.jsx
 import React from 'react';
 
 const RatingBadge = ({ rating, className = "" }) => {
@@ -24,7 +25,7 @@ const RatingBadge = ({ rating, className = "" }) => {
   return (
     <div className={`
       flex items-center justify-center
-      px-1.5 py-0.5 rounded-full border border-white 
+      px-2 py-0.5 rounded-full border border-white 
       text-[9px] font-black text-white leading-none shadow-sm
       ${colorClass} ${className}
     `}>
