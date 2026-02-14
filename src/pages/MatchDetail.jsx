@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import Backbutton from '../components/Backbutton'; 
 import MatchHeader from '../components/MatchHeader';
 import Lineup from '../components/Lineup';
+import Formation from '../components/Formation';
 
 function MatchDetail() {
   const location = useLocation();
@@ -17,6 +18,9 @@ function MatchDetail() {
   const [loading, setLoading] = useState(true);
 
   const [error, setError] = useState(null);
+
+  // ★追加: タブの切り替え状態 ('lineup' | 'formation')
+  const [activeTab, setActiveTab] = useState('lineup');
 
   // データがない場合（直接アクセスなど）はトップページに強制的に戻す
   useEffect(() => {
@@ -98,27 +102,49 @@ function MatchDetail() {
         date={matchData.date}
         details={details} // EventList表示用に渡す
         loading={loading} // Loading表示用に渡す
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
       />
 
-      {/* 3. コンテンツエリア 
-         ヘッダーが EventList を含むため高さが可変ですが、
-         初期状態の高さに合わせて余白(pt)を大きめに取ります。
-         ※EventListが多い場合は被る可能性があるため、本来は動的計算がベストですが、
-           まずは十分な余白(pt-80程度)で調整します。
-      */}
-      <div className="pt-80 max-w-2xl mx-auto px-4 pb-20">
-        {/* スタメン表示*/}
-        {details && details.lineups ? (
-          <Lineup lineups={details.lineups} />
-        ) : (
-          !loading && (
-            <p className="text-center text-gray-400 text-xs mt-10">
-              LINEUP INFO NOT AVAILABLE
-            </p>)
-        )}
-        <div className="h-20"></div>
-      </div>
+      {/* 3. コンテンツエリア */}
+      {/* ヘッダー内にタブが入った分、ヘッダー全体の高さが増えます。
+          そのため、初期の余白(pt)を少し増やす必要があります (例: pt-80 -> pt-96) */}
+      <div className="pt-60 pb-0">
 
+        {/* --- 詳細コンテンツ --- */}
+        <div className="max-w-2xl mx-auto px-4 mt-4">
+            {loading ? (
+            <div className="flex justify-center mt-20">
+                <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+            </div>
+            ) : details && details.lineups ? (
+            <>
+                {activeTab === 'lineup' && (
+                <div className="animate-slideIn">
+                    <Lineup lineups={details.lineups} />
+                </div>
+                )}
+
+                {activeTab === 'formation' && (
+                <div className="animate-slideIn">
+                    <Formation 
+                        homeLineup={details.lineups[0]} 
+                        awayLineup={details.lineups[1]} 
+                        homeStats={details.players?.[0]?.players}
+                        awayStats={details.players?.[1]?.players}
+                    />
+                </div>
+                )}
+            </>
+            ) : (
+            !loading && (
+                <p className="text-center text-gray-400 text-xs mt-10">
+                DATA NOT AVAILABLE
+                </p>
+            )
+            )}
+          </div>
+      </div>
     </div>
   );
 }

@@ -7,7 +7,7 @@ function ApiTestMatchDetail() {
     const [error, setError] = useState(null);
 
     // テストしたい特定の試合ID (Nottingham Forest vs Wolves)
-    const MATCH_ID = '1379225';
+    const MATCH_ID = '1506257'; // Hull City vs Chelsae
 
     const runTest = async () => {
         setLoading(true);
