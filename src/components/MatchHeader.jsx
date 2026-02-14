@@ -2,12 +2,14 @@
 import { useState, useEffect, useRef } from 'react';
 import TeamBadge from './TeamBadge';
 import EventList from './EventList';
+import MatchTabs from './MatchTabs';
 
 function MatchHeader({
     homeId, homeTeam, homeLogo,
     awayId, awayTeam, awayLogo,
     score, status, date,
-    details, loading // EventList表示用に必要
+    details, loading, // EventList表示用に必要
+    activeTab, onTabChange
 }) {
     const [scrollY, setScrollY] = useState(0);
 
@@ -81,10 +83,10 @@ function MatchHeader({
 
     return (
         <div 
-            className="fixed top-0 left-0 w-full z-40 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100 overflow-hidden will-change-transform"
+            className="fixed top-0 left-0 w-full z-40 bg-white/95 backdrop-blur-md shadow-sm border-gray-100 overflow-hidden will-change-transform"
             style={{
                 paddingTop: '1.5rem', // 上部は固定
-                paddingBottom: `${currentPaddingBottom}px`, // 下部はスクロールで詰める
+                //paddingBottom: `${currentPaddingBottom}px`, // 下部はスクロールで詰める
             }}
         >
             <div className="max-w-2xl mx-auto px-4 relative">
@@ -176,6 +178,10 @@ function MatchHeader({
                         </div>
                     </div>
                 </div>
+            </div>
+            {/* --- ★追加: タブエリア (ヘッダーの最下部に固定) --- */}
+            <div className="w-full mt-auto">
+                <MatchTabs activeTab={activeTab} onTabChange={onTabChange} />
             </div>
         </div>
     );
