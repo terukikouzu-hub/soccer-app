@@ -5,6 +5,7 @@ import Backbutton from '../components/Backbutton';
 import MatchHeader from '../components/MatchHeader';
 import Lineup from '../components/Lineup';
 import Formation from '../components/Formation';
+import { supabase } from '../lib/supabase';
 
 function MatchDetail() {
   const location = useLocation();
@@ -37,28 +38,23 @@ function MatchDetail() {
       setError(null);
 
       try {
-        const API_KEY = import.meta.env.VITE_API_FOOTBALL_KEY;
+        console.log(`★ Edge Function (get-match-details) に 試合ID: ${matchData.id} をリクエストします...`);
+        
+        // -----------------------------------------------------------
+        // 1. 新しい門番（Edge Function）にすべてお任せする
+        // -----------------------------------------------------------
+        const { data: funcData, error: funcError } = await supabase.functions.invoke('get-match-details', {
+          body: { matchId: matchData.id }
+        });
 
-        //IDで試合情報を取得
-        const response = await fetch(
-          `https://v3.football.api-sports.io/fixtures?id=${matchData.id}`,
-          {
-            headers: {
-              'x-rapidapi-key': API_KEY,
-              'x-apisports-key': API_KEY
-            }
-          }
-        );
+        if (funcError) throw funcError;
 
-        if (!response.ok) throw new Error('データ取得に失敗しました');
-        const json = await response.json();
-
-        // ID指定の場合、response配列には該当する1試合だけが入ってきます
-        if (json.response && json.response.length > 0) {
-          const targetMatch = json.response[0];
-          console.log("▼ API取得イベントデータ:", targetMatch.events);
-          const substEvents = targetMatch.events.filter(e => e.type === 'subst');
-          console.log("▼ 交代イベントのみ抽出:", substEvents);
+        // -----------------------------------------------------------
+        // 2. 門番から受け取った詳細データを画面にセットする
+        // -----------------------------------------------------------
+        if (funcData && funcData.response && funcData.response.length > 0) {
+          const targetMatch = funcData.response[0];
+          console.log("▼ 取得した詳細データ:", targetMatch);
           setDetails(targetMatch);
         } else {
           setError('詳細データが見つかりませんでした');
@@ -80,7 +76,7 @@ function MatchDetail() {
 
   // 表示用データの優先順位: API詳細データ > 一覧から渡されたデータ
   // 詳細データがあればそちらのスコアを、なければ一覧データのスコアを使う
-  const displayScore = details
+  const displayScore = details&& details.goals && details.goals.home !== null
     ? `${details.goals.home} - ${details.goals.away}`
     : matchData.score;
 

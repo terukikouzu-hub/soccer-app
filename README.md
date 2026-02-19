@@ -1,5 +1,13 @@
 germany50d15091160bb23951caf6c620830dd3
-teruki93eae9988c2f7be9fe42f4c4de26dc3c
+teruki
+
+supabaseパス:81403002AbCd
+
+Step 1: Supabaseのダッシュボードで match_details テーブルを作る
+
+Step 2: 詳細画面用の Edge Function を作ってデプロイする
+
+Step 3: MatchDetail.jsx をそれに合わせて修正する
 
 #MatchList
 ✅10MTCHS削除

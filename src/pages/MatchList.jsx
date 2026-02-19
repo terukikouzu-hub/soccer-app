@@ -7,6 +7,7 @@ import CompetitionGroup from '../components/CompetitionGroup';
 //import CompetitionSelector from '../components/CompetitionSelector';
 //import CompetitionModal from '../components/CompetitionModal';
 //import MatchdayModal from '../components/MatchdayModal';
+import { supabase } from '../lib/supabase';
 
 // 表示したいコンペティションの定義
 const TARGET_LEAGUES = {
@@ -19,7 +20,7 @@ const TARGET_LEAGUES = {
   135: { code: 'SERIE', priority: 7 },  // Serie A
   78: { code: 'BL', priority: 5 },      // Bundesliga
   61: { code: 'L1', priority: 8 },      // Ligue 1
-  
+
   // 欧州その他
   848: { code: 'ECL', priority: 9 },    // Conference League
   5: { code: 'UNL', priority: 10 },     // Nations League
@@ -50,7 +51,7 @@ function MatchList() {
   // フラットな試合データではなく、グループ化されたデータを持つ
   const [groupedMatches, setGroupedMatches] = useState([]);
   const [activeLeagues, setActiveLeagues] = useState([]); // その日試合があるリーグ一覧(Nav用)
-  
+
   const [currentDate, setCurrentDate] = useState(new Date());
   const [isLoading, setIsLoading] = useState(true);
 
@@ -60,117 +61,138 @@ function MatchList() {
   // リーグナビの表示状態 (デフォルトfalse = 非表示)
   const [isNavOpen, setIsNavOpen] = useState(false);
 
-  //1. 試合データを取得（日付またはリーグが変わるたびに実行）
-  useEffect(() => {
-    setIsLoading(true);
-    const API_KEY = import.meta.env.VITE_API_FOOTBALL_KEY;
+  const processMatchData = (apiResponse, targetDate) => {
+    if (!apiResponse) return;
 
-    // APIリクエスト用の日付文字列 (UTCベースでもJSTベースでも、API側が解釈できる形式で送る)
-    const year = currentDate.getFullYear();
-    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-    const day = String(currentDate.getDate()).padStart(2, '0');
-    const dateStr = `${year}-${month}-${day}`;
+    // ★追加: ここで生データをログに出す
+    console.log("▼ 取得した試合データの全容:", apiResponse);
 
-    // APIには「日本時間」を要求する
-    const userTimezone = 'Asia/Tokyo';
+    // もし1件目の詳細が見たいなら
+    if (apiResponse.length > 0) {
+        console.log("▼ 1試合目の詳細データ:", apiResponse[0]);
+    }
 
-    fetch(`https://v3.football.api-sports.io/fixtures?date=${dateStr}&timezone=${userTimezone}`, {
-      headers: {
-        'x-rapidapi-key': API_KEY,
-        'x-apisports-key': API_KEY
+    const targetDateJST = new Date(targetDate.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+    const targetY = targetDateJST.getFullYear();
+    const targetM = targetDateJST.getMonth();
+    const targetD = targetDateJST.getDate();
+
+    const formatted = apiResponse
+      .filter(item => {
+        const matchDateUTC = new Date(item.fixture.date);
+        const matchDateJST = new Date(matchDateUTC.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+        return (
+          matchDateJST.getFullYear() === targetY &&
+          matchDateJST.getMonth() === targetM &&
+          matchDateJST.getDate() === targetD
+        );
+      }).map(item => ({
+        id: item.fixture.id,
+        leagueId: item.league.id,
+        leagueName: item.league.name,
+        leagueLogo: item.league.logo,
+        leagueCountry: item.league.country,
+        homeId: item.teams.home.id,
+        home: item.teams.home.name,
+        homeLogo: item.teams.home.logo,
+        awayId: item.teams.away.id,
+        away: item.teams.away.name,
+        awayLogo: item.teams.away.logo,
+        score: item.goals.home !== null ? `${item.goals.home} - ${item.goals.away}` : "VS",
+        date: item.fixture.date,
+        status: item.fixture.status.short
+      }));
+
+    const groups = {};
+    formatted.forEach(match => {
+      if (TARGET_LEAGUES[match.leagueId]) {
+        if (!groups[match.leagueId]) {
+          groups[match.leagueId] = {
+            id: match.leagueId,
+            name: match.leagueName,
+            logo: match.leagueLogo,
+            country: match.leagueCountry,
+            code: TARGET_LEAGUES[match.leagueId].code,
+            priority: TARGET_LEAGUES[match.leagueId].priority,
+            matches: []
+          };
+        }
+        groups[match.leagueId].matches.push(match);
       }
-    })
-      .then(res => {
-        if (!res.ok) throw new Error('APIリクエストに失敗しました');
-        return res.json();
-      })
-      .then(data => {
-        if (!data.response) {
-            setGroupedMatches([]);
-            setActiveLeagues([]);
-            setIsLoading(false);
-            return;
+    });
+
+    const sortedGroups = Object.values(groups).sort((a, b) => a.priority - b.priority);
+    setGroupedMatches(sortedGroups);
+    setActiveLeagues(sortedGroups.map(g => ({ id: g.id, name: g.name, logo: g.logo, code: g.code })));
+
+    const initialOpenState = {};
+    sortedGroups.forEach(g => { initialOpenState[g.id] = true; });
+    setOpenStates(initialOpenState);
+  };
+
+  useEffect(() => {
+    const fetchAllData = async () => {
+      setIsLoading(true);
+
+      // APIに送るための日付文字列 (YYYY-MM-DD)
+      const year = currentDate.getFullYear();
+      const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+      const day = String(currentDate.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+
+      // ★追加: DB検索用の日付範囲計算 (時差対策のため、前後1日広めに取る)
+      const yesterday = new Date(currentDate);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      const tomorrow = new Date(currentDate);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      // 日付を YYYY-MM-DD 形式にする関数
+      const formatYMD = (d) => {
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      };
+
+      try {
+        // --- 1. SupabaseのDBからデータを取得試行 ---
+        const { data: dbData, error: dbError } = await supabase
+          .from('matches')
+          .select('data')
+          .gte('date', `${formatYMD(yesterday)}T00:00:00`)
+          .lte('date', `${formatYMD(tomorrow)}T23:59:59`);
+
+        if (dbData && dbData.length > 0) {
+          console.log(`Supabase DBから${dbData.length} 件のデータを読み込みました`);
+          // DB保存形式(dataカラム内のリスト)を抽出して整形ロジックへ
+          const rawMatches = dbData.map(d => d.data);
+          processMatchData(rawMatches, currentDate);
+          setIsLoading(false);
+          return;
         }
 
-        // ★★★ ここが最強のフィルタリングロジックです ★★★
-        // 1. ユーザーが選択している「日本時間での年月日」を取得
-        // toLocaleStringを使うことで、ブラウザの内部時間に左右されず強制的にJSTへ変換して取得
-        const targetDateJST = new Date(currentDate.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
-        const targetY = targetDateJST.getFullYear();
-        const targetM = targetDateJST.getMonth();
-        const targetD = targetDateJST.getDate();
-
-        // 2. データを整形しつつフィルタリング
-        const formatted = data.response
-          .filter(item => {
-            // 試合開始時間 (UTC) を取得
-            const matchDateUTC = new Date(item.fixture.date);
-            
-            // それを「日本時間」に変換したときの日付を取得
-            const matchDateJST = new Date(matchDateUTC.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
-            
-            // 年・月・日が完全に一致するかチェック
-            const isSameDay = 
-                matchDateJST.getFullYear() === targetY &&
-                matchDateJST.getMonth() === targetM &&
-                matchDateJST.getDate() === targetD;
-
-            return isSameDay;
-          }).map(item => ({
-          id: item.fixture.id,
-          leagueId: item.league.id,
-          leagueName: item.league.name,
-          leagueLogo: item.league.logo,
-          leagueCountry: item.league.country,
-          homeId: item.teams.home.id,
-          home: item.teams.home.name,
-          homeLogo: item.teams.home.logo,
-          awayId: item.teams.away.id,
-          away: item.teams.away.name,
-          awayLogo: item.teams.away.logo,
-          score: item.goals.home !== null ? `${item.goals.home} - ${item.goals.away}` : "VS",
-          date: item.fixture.date,
-          status: item.fixture.status.short
-        }));
-
-        // 2. リーグごとにグループ化 (TARGET_LEAGUESに含まれるものだけ)
-        const groups = {};
-
-        formatted.forEach(match => {
-           // 定義済みリストにあるリーグのみ抽出
-           if (TARGET_LEAGUES[match.leagueId]) {
-               if (!groups[match.leagueId]) {
-                   groups[match.leagueId] = {
-                       id: match.leagueId,
-                       name: match.leagueName,
-                       logo: match.leagueLogo,
-                       country: match.leagueCountry,
-                       code: TARGET_LEAGUES[match.leagueId].code,
-                       priority: TARGET_LEAGUES[match.leagueId].priority,
-                       matches: []
-                   };
-               }
-               groups[match.leagueId].matches.push(match);
-           }
+        // --- 2. DBにない場合、Edge Function（門番）を呼び出す ---
+        console.log("DBにデータがないため、Edge Functionを呼び出します...");
+        const { data: funcData, error: funcError } = await supabase.functions.invoke('get-matches', {
+          body: { date: dateStr }
         });
 
-        // 3. 優先度順にソート
-        const sortedGroups = Object.values(groups).sort((a, b) => a.priority - b.priority);
+        if (funcError) throw funcError;
 
-        setGroupedMatches(sortedGroups);
-        setActiveLeagues(sortedGroups.map(g => ({ id: g.id, name: g.name, logo: g.logo, code: g.code })));
-
-        // 4. 初期状態で全て開く
-        const initialOpenState = {};
-        sortedGroups.forEach(g => { initialOpenState[g.id] = true; });
-        setOpenStates(initialOpenState);
-
+        if (funcData && funcData.response) {
+          processMatchData(funcData.response, currentDate);
+        } else {
+          setGroupedMatches([]);
+          setActiveLeagues([]);
+        }
+      } catch (err) {
+        console.error("データ取得エラー:", err);
+        setGroupedMatches([]);
+        setActiveLeagues([]);
+      } finally {
         setIsLoading(false);
-      })
-      .catch(err => {
-        console.error(err);
-        setIsLoading(false);
-      });
+      }
+    };
+
+    fetchAllData();
   }, [currentDate]);
 
   // 日付操作関数
@@ -203,11 +225,11 @@ function MatchList() {
   const scrollToLeague = (leagueId) => {
     const element = document.getElementById(`league-${leagueId}`);
     if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        // 閉じていたら開く
-        if (!openStates[leagueId]) {
-            setOpenStates(prev => ({ ...prev, [leagueId]: true }));
-        }
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // 閉じていたら開く
+      if (!openStates[leagueId]) {
+        setOpenStates(prev => ({ ...prev, [leagueId]: true }));
+      }
     }
     // 選択したらメニューを閉じる
     setIsNavOpen(false);
@@ -219,10 +241,10 @@ function MatchList() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
-      
+
       {/* Header全体を sticky top-0 にして、その中に「タイトル」「日付」「全開閉」「リーグナビ」を全部入れる*/}
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-200">
-        
+
         {/* 1. タイトルエリア */}
         <div className="max-w-md mx-auto px-4 py-2 text-center border-b border-gray-100">
           <h1 className="text-lg font-black text-blue-600 tracking-tighter">
@@ -232,54 +254,53 @@ function MatchList() {
 
         {/* 2. 日付 & リーグ選択トグル */}
         <div className="relative flex items-center justify-center py-2 max-w-md mx-auto">
-            {/* 日付操作 (中央) */}
-            <div className="flex items-center gap-6">
-                <button 
-                    onClick={handlePrevDay} 
-                    className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-50 border border-gray-200 text-gray-500 hover:bg-blue-50 transition-all active:scale-95"
-                >
-                    ◀
-                </button>
-                
-                <h2 className="text-s font-black text-gray-800 italic leading-none whitespace-nowrap min-w-[140px] text-center">
-                    {displayDateStr}
-                </h2>
-                
-                <button 
-                    onClick={handleNextDay} 
-                    className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-50 border border-gray-200 text-gray-500 hover:bg-blue-50 transition-all active:scale-95"
-                >
-                    ▶
-                </button>
-            </div>
-
-            {/* ★追加: リーグメニュー開閉ボタン (右端に配置) */}
+          {/* 日付操作 (中央) */}
+          <div className="flex items-center gap-6">
             <button
-                onClick={() => setIsNavOpen(!isNavOpen)}
-                className={`absolute right-4 text-[10px] font-bold px-2 py-1 rounded border transition-colors ${
-                    isNavOpen 
-                    ? 'bg-blue-50 text-blue-600 border-blue-200' 
-                    : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
-                }`}
+              onClick={handlePrevDay}
+              className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-50 border border-gray-200 text-gray-500 hover:bg-blue-50 transition-all active:scale-95"
             >
-                リーグを選択
+              ◀
             </button>
+
+            <h2 className="text-s font-black text-gray-800 italic leading-none whitespace-nowrap min-w-[140px] text-center">
+              {displayDateStr}
+            </h2>
+
+            <button
+              onClick={handleNextDay}
+              className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-50 border border-gray-200 text-gray-500 hover:bg-blue-50 transition-all active:scale-95"
+            >
+              ▶
+            </button>
+          </div>
+
+          {/* ★追加: リーグメニュー開閉ボタン (右端に配置) */}
+          <button
+            onClick={() => setIsNavOpen(!isNavOpen)}
+            className={`absolute right-4 text-[10px] font-bold px-2 py-1 rounded border transition-colors ${isNavOpen
+                ? 'bg-blue-50 text-blue-600 border-blue-200'
+                : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+              }`}
+          >
+            リーグを選択
+          </button>
         </div>
 
         {/* 3. リーグナビ (条件付きレンダリング) */}
         {/* isNavOpen が true の時だけ表示 */}
         {isNavOpen && !isLoading && groupedMatches.length > 0 && (
-            <div className="border-t border-gray-100 animate-slideDown origin-top">
-                <LeagueNav leagues={activeLeagues} onLeagueClick={scrollToLeague} />
-                
-                {/* 閉じるための簡易バー（お好みで） */}
-                <div 
-                    onClick={() => setIsNavOpen(false)}
-                    className="w-full h-4 bg-gray-50 flex items-center justify-center cursor-pointer hover:bg-gray-100"
-                >
-                     <div className="w-10 h-1 bg-gray-300 rounded-full"></div>
-                </div>
+          <div className="border-t border-gray-100 animate-slideDown origin-top">
+            <LeagueNav leagues={activeLeagues} onLeagueClick={scrollToLeague} />
+
+            {/* 閉じるための簡易バー（お好みで） */}
+            <div
+              onClick={() => setIsNavOpen(false)}
+              className="w-full h-4 bg-gray-50 flex items-center justify-center cursor-pointer hover:bg-gray-100"
+            >
+              <div className="w-10 h-1 bg-gray-300 rounded-full"></div>
             </div>
+          </div>
         )}
       </header>
 
@@ -292,21 +313,21 @@ function MatchList() {
         ) : (
           <div className="px-4 max-w-md mx-auto">
             {groupedMatches.length > 0 ? (
-                groupedMatches.map(group => (
-                    <CompetitionGroup 
-                        key={group.id}
-                        league={group}
-                        matches={group.matches}
-                        isOpen={openStates[group.id]}
-                        onToggle={() => toggleAccordion(group.id)}
-                        onMatchClick={(match) => navigate(`/match/${match.id}`, { state: { matchData: match } })}
-                    />
-                ))
+              groupedMatches.map(group => (
+                <CompetitionGroup
+                  key={group.id}
+                  league={group}
+                  matches={group.matches}
+                  isOpen={openStates[group.id]}
+                  onToggle={() => toggleAccordion(group.id)}
+                  onMatchClick={(match) => navigate(`/match/${match.id}`, { state: { matchData: match } })}
+                />
+              ))
             ) : (
-                <div className="text-center text-gray-400 mt-10">
-                    <p>NO MATCHES</p>
-                    <p className="text-xs">ON THIS DAY</p>
-                </div>
+              <div className="text-center text-gray-400 mt-10">
+                <p>NO MATCHES</p>
+                <p className="text-xs">ON THIS DAY</p>
+              </div>
             )}
           </div>
         )}
