@@ -3,11 +3,6 @@ teruki
 
 supabaseパス:81403002AbCd
 
-Step 1: Supabaseのダッシュボードで match_details テーブルを作る
-
-Step 2: 詳細画面用の Edge Function を作ってデプロイする
-
-Step 3: MatchDetail.jsx をそれに合わせて修正する
 
 #MatchList
 ✅10MTCHS削除
@@ -26,6 +21,7 @@ Step 3: MatchDetail.jsx をそれに合わせて修正する
 次節
 各コンペティションの状況
 選手一覧
+⚠同じ背番号の選手がいる（DBに試合がたまってきたら出場経験でフィルターをかける）
 
 #MatchDetail
 🙅両チーム直近5試合
