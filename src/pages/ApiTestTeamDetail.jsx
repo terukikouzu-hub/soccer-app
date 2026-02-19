@@ -1,11 +1,15 @@
 // src/pages/ApiTestTeamDetail.jsx
 import React, { useState } from 'react';
 import Backbutton from '../components/Backbutton';
+import { supabase } from '../lib/supabase'; // ★追加
 
 function ApiTestTeamDetail() {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+
+    const [saving, setSaving] = useState(false);
+    const [saveMessage, setSaveMessage] = useState('');
 
     // テスト用のパラメータ（アトレティコマドリードのIDを指定）
     const [teamId, setTeamId] = useState(530);
@@ -48,6 +52,49 @@ function ApiTestTeamDetail() {
         }
     };
 
+    // ★チーム情報をDBに保存する関数
+    const saveToDB = async () => {
+        if (!data || !data.response || data.response.length === 0) return;
+
+        setSaving(true);
+        setSaveMessage('');
+
+        try {
+            const teamInfo = data.response[0].team;
+            const venueInfo = data.response[0].venue;
+
+            // Supabaseの teams テーブルに保存
+            const { error: supabaseError } = await supabase
+                .from('teams')
+                .upsert({
+                    id: teamInfo.id,
+                    name: teamInfo.name,
+                    code: teamInfo.code,
+                    country: teamInfo.country,
+                    founded: teamInfo.founded,
+                    national: teamInfo.national,
+                    logo: teamInfo.logo,
+                    // スタジアム情報をフラットに保存
+                    venue_id: venueInfo.id,
+                    venue_name: venueInfo.name,
+                    venue_address: venueInfo.address,
+                    venue_city: venueInfo.city,
+                    venue_capacity: venueInfo.capacity,
+                    venue_image: venueInfo.image,
+                    updated_at: new Date().toISOString()
+                });
+
+            if (supabaseError) throw supabaseError;
+
+            setSaveMessage('✅ チーム情報をDBに保存しました！');
+        } catch (err) {
+            console.error("DB保存エラー:", err);
+            setSaveMessage('❌ 保存に失敗: ' + err.message);
+        } finally {
+            setSaving(false);
+        }
+    };
+
     return (
         <div className="p-8 bg-gray-100 min-h-screen">
             <Backbutton />
@@ -83,6 +130,19 @@ function ApiTestTeamDetail() {
                 <div className="bg-white p-4 rounded shadow overflow-auto">
                     <div className="flex justify-between items-center mb-4">
                         <h2 className="text-lg font-bold">取得結果: {data.results} 件</h2>
+                        {/* ★DB保存ボタン */}
+                        <div className="flex items-center gap-3">
+                            {saveMessage && (
+                                <span className="text-sm font-bold text-green-600">{saveMessage}</span>
+                            )}
+                            <button
+                                onClick={saveToDB}
+                                disabled={saving}
+                                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 font-bold text-sm transition-transform active:scale-95 disabled:bg-green-300"
+                            >
+                                {saving ? '保存中...' : 'チーム情報をDBに保存'}
+                            </button>
+                        </div>
                     </div>
                     
                     <p className="text-sm text-gray-500 mb-4">※下の方にスクロールすると詳細が見れます</p>
