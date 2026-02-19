@@ -23,6 +23,8 @@ function MatchDetail() {
   // ★追加: タブの切り替え状態 ('lineup' | 'formation')
   const [activeTab, setActiveTab] = useState('lineup');
 
+  const [headerHeight, setHeaderHeight] = useState(240);
+
   // データがない場合（直接アクセスなど）はトップページに強制的に戻す
   useEffect(() => {
     if (!matchData) {
@@ -102,12 +104,11 @@ function MatchDetail() {
         loading={loading} // Loading表示用に渡す
         activeTab={activeTab}
         onTabChange={setActiveTab}
+        onHeightChange={setHeaderHeight}
       />
 
       {/* 3. コンテンツエリア */}
-      {/* ヘッダー内にタブが入った分、ヘッダー全体の高さが増えます。
-          そのため、初期の余白(pt)を少し増やす必要があります (例: pt-80 -> pt-96) */}
-      <div className="pt-60 pb-0">
+      <div className="pb-0" style={{ paddingTop: `${headerHeight}px` }}>
 
         {/* --- 詳細コンテンツ --- */}
         <div className="max-w-2xl mx-auto px-4 mt-4">

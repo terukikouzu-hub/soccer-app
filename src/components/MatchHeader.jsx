@@ -9,13 +9,30 @@ function MatchHeader({
     awayId, awayTeam, awayLogo,
     score, status, date,
     details, loading, // EventList表示用に必要
-    activeTab, onTabChange
+    activeTab, onTabChange,
+    onHeightChange
 }) {
     const [scrollY, setScrollY] = useState(0);
+    const headerRef = useRef(null);
 
     // 可変長のEventListの高さを測るための準備
     const [contentHeight, setContentHeight] = useState(0);
     const contentRef = useRef(null);
+    // --- ヘッダーの高さを監視して親に報告する ---
+    useEffect(() => {
+        if (!headerRef.current) return;
+
+        // ResizeObserverを使うと、中身（EventList）が増えて高さが変わった瞬間に検知できます
+        const resizeObserver = new ResizeObserver((entries) => {
+            for (let entry of entries) {
+                // 親の MatchDetail に現在の高さを伝える
+                onHeightChange(entry.contentRect.height);
+            }
+        });
+
+        resizeObserver.observe(headerRef.current);
+        return () => resizeObserver.disconnect();
+    }, [onHeightChange]);
 
     // スクロール検知
     useEffect(() => {
@@ -83,6 +100,7 @@ function MatchHeader({
 
     return (
         <div 
+            ref={headerRef}
             className="fixed top-0 left-0 w-full z-40 bg-white/95 backdrop-blur-md shadow-sm border-gray-100 overflow-hidden will-change-transform"
             style={{
                 paddingTop: '1.5rem', // 上部は固定
