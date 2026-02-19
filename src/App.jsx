@@ -7,6 +7,7 @@ import MatchDetail from './pages/MatchDetail';
 import ApiTestMatchList from './pages/ApiTestMatchList';
 import ApiTestMatchDetail from './pages/ApiTestMatchDetail';
 import TestScroll from './pages/TestScroll';
+import ApiTestPlayerDetail from './pages/ApiTestPlayerDetail';
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
       <Route path="/test-list" element={<ApiTestMatchList />} />
       <Route path="/test-detail" element={<ApiTestMatchDetail />} />
       <Route path="/test-scroll" element={<TestScroll />} />
+      <Route path="/test-player" element={<ApiTestPlayerDetail />} />
     </Routes>
   );
 }
