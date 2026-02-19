@@ -10,7 +10,7 @@ const MatchTabs = ({ activeTab, onTabChange }) => {
 
   return (
     // ヘッダーの下に配置することを想定したコンテナ
-    <div className="bg-white/80 backdrop-blur-md border-b border-gray-100">
+    <div className="bg-white/80 backdrop-blur-md border-t border-b border-gray-100">
       <div className="flex w-full">
         {tabs.map((tab) => (
           <button
