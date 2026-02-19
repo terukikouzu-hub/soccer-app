@@ -64,6 +64,14 @@ function MatchList() {
   const processMatchData = (apiResponse, targetDate) => {
     if (!apiResponse) return;
 
+    // ★追加: ここで生データをログに出す
+    console.log("▼ 取得した試合データの全容:", apiResponse);
+
+    // もし1件目の詳細が見たいなら
+    if (apiResponse.length > 0) {
+        console.log("▼ 1試合目の詳細データ:", apiResponse[0]);
+    }
+
     const targetDateJST = new Date(targetDate.toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
     const targetY = targetDateJST.getFullYear();
     const targetM = targetDateJST.getMonth();
@@ -126,21 +134,34 @@ function MatchList() {
     const fetchAllData = async () => {
       setIsLoading(true);
 
+      // APIに送るための日付文字列 (YYYY-MM-DD)
       const year = currentDate.getFullYear();
       const month = String(currentDate.getMonth() + 1).padStart(2, '0');
       const day = String(currentDate.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
+
+      // ★追加: DB検索用の日付範囲計算 (時差対策のため、前後1日広めに取る)
+      const yesterday = new Date(currentDate);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      const tomorrow = new Date(currentDate);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      // 日付を YYYY-MM-DD 形式にする関数
+      const formatYMD = (d) => {
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      };
 
       try {
         // --- 1. SupabaseのDBからデータを取得試行 ---
         const { data: dbData, error: dbError } = await supabase
           .from('matches')
           .select('data')
-          .gte('date', `${dateStr}T00:00:00`)
-          .lte('date', `${dateStr}T23:59:59`);
+          .gte('date', `${formatYMD(yesterday)}T00:00:00`)
+          .lte('date', `${formatYMD(tomorrow)}T23:59:59`);
 
         if (dbData && dbData.length > 0) {
-          console.log("Supabase DBからデータを読み込みました");
+          console.log(`Supabase DBから${dbData.length} 件のデータを読み込みました`);
           // DB保存形式(dataカラム内のリスト)を抽出して整形ロジックへ
           const rawMatches = dbData.map(d => d.data);
           processMatchData(rawMatches, currentDate);
