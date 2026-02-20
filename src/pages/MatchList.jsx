@@ -13,30 +13,30 @@ import { supabase } from '../lib/supabase';
 const TARGET_LEAGUES = {
   // 欧州・国際 (優先度高)
   2: { code: 'CL', priority: 2 },       // Champions League
-  1: { code: 'WC', priority: 9 },       // World Cup
-  3: { code: 'EL', priority: 10 },       // Europa League
+  1: { code: 'WC', priority: 1 },       // World Cup
+  3: { code: 'EL', priority: 12 },       // Europa League
   39: { code: 'PL', priority: 1 },      // Premier League
-  140: { code: 'LIGA', priority: 6 },   // La Liga
+  140: { code: 'LIGA', priority: 10 },   // La Liga
   135: { code: 'SERIE', priority: 7 },  // Serie A
   78: { code: 'BL', priority: 5 },      // Bundesliga
-  61: { code: 'L1', priority: 8 },      // Ligue 1
+  61: { code: 'L1', priority: 15 },      // Ligue 1
 
   // 欧州その他
-  848: { code: 'ECL', priority: 9 },    // Conference League
-  5: { code: 'UNL', priority: 10 },     // Nations League
+  848: { code: 'ECL', priority: 14 },    // Conference League
+  5: { code: 'UNL', priority: 13 },     // Nations League
   4: { code: 'EURO', priority: 11 },    // Euro
 
   // 南米
-  9: { code: 'COPA', priority: 12 },    // Copa America
+  9: { code: 'COPA', priority: 17 },    // Copa America
 
   // 国内カップ戦など
   45: { code: 'FAC', priority: 3 },    // FA Cup
   48: { code: 'CAR', priority: 4 },    // Carabao Cup
-  143: { code: 'CDR', priority: 15 },   // Copa del Rey
-  137: { code: 'COI', priority: 16 },   // Coppa Italia
-  81: { code: 'DFB', priority: 17 },    // DFB Pokal
-  66: { code: 'CDF', priority: 18 },    // Coupe de France
-  40: { code: 'CHA', priority: 19 },    // Championship
+  143: { code: 'CDR', priority: 11 },   // Copa del Rey
+  137: { code: 'COI', priority: 8 },   // Coppa Italia
+  81: { code: 'DFB', priority: 6 },    // DFB Pokal
+  66: { code: 'CDF', priority: 16 },    // Coupe de France
+  40: { code: 'CHA', priority: 9 },    // Championship
 
   // 日本
   98: { code: 'J1', priority: 20 },     // J1 League
