@@ -41,23 +41,21 @@ Deno.serve(async (_req) => {
     const now = new Date();
 
     // 1. 前日 (Yesterday)
-    const yesterday = new Date(now);
-    yesterday.setUTCDate(now.getUTCDate() - 1);
-    const yesterdayUTC = yesterday.toISOString().split('T')[0];
+    const yesterdayUTC = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
     // 2. 当日 (Today)
     const todayUTC = now.toISOString().split('T')[0];
     
     // 3. 翌日 (Tomorrow)
-    const tomorrow = new Date(now);
-    tomorrow.setUTCDate(now.getUTCDate() + 1);
-    const tomorrowUTC = tomorrow.toISOString().split('T')[0];
+    const tomorrowUTC = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
     // 取得対象の配列
     const datesToFetch = [yesterdayUTC, todayUTC, tomorrowUTC];
     console.log(`🚀 Sync started for UTC dates: ${datesToFetch.join(", ")}`);
 
-    let totalSynced = 0;
+    let totalFixturesSynced = 0;
+    let totalTeamsSynced = 0;
+
     const syncedLeagues = new Set<string>();
 
     // 3日分ループ
@@ -88,6 +86,27 @@ Deno.serve(async (_req) => {
       );
 
       if (filtered.length > 0) {
+        // --- ✨ [追加機能] チーム情報を抽出して保存 ---
+        const teamsMap = new Map();
+        filtered.forEach((f: any) => {
+          // ホームチーム
+          teamsMap.set(f.teams.home.id, {
+            id: f.teams.home.id,
+            name: f.teams.home.name,
+            logo: f.teams.home.logo,
+          });
+          // アウェイチーム
+          teamsMap.set(f.teams.away.id, {
+            id: f.teams.away.id,
+            name: f.teams.away.name,
+            logo: f.teams.away.logo,
+          });
+          syncedLeagues.add(f.league.name);
+        });
+        const teamsToUpsert = Array.from(teamsMap.values());
+        const { error: teamError } = await supabase.from("teams").upsert(teamsToUpsert);
+        if (teamError) console.error("⚠️ Team sync error:", teamError.message);
+        totalTeamsSynced += teamsToUpsert.length;
         // データの整形
         const upsertData = filtered.map((f: any) => ({
           id: f.fixture.id,
@@ -120,7 +139,7 @@ Deno.serve(async (_req) => {
         const { error } = await supabase.from("fixtures").upsert(upsertData);
         if (error) throw error;
 
-        totalSynced += upsertData.length;
+        totalFixturesSynced += upsertData.length;
         filtered.forEach((f: any) => syncedLeagues.add(f.league.name));
         console.log(`✅ ${dateString}: Synced ${upsertData.length} matches.`);
       }
@@ -128,7 +147,8 @@ Deno.serve(async (_req) => {
 
     return new Response(JSON.stringify({ 
       status: "Daily sync complete",
-      synced_total: totalSynced,
+      synced_fixtures: totalFixturesSynced,
+      synced_teams: totalTeamsSynced,
       leagues: Array.from(syncedLeagues),
       period: datesToFetch
     }), {
