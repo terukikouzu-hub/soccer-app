@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 const API_KEY = Deno.env.get("API_FOOTBALL_KEY")!;
 
 Deno.serve(async (req) => {
+  console.log(`🚀 [START] fixtures-every5min: Function triggered`);
   try {
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -14,8 +15,8 @@ Deno.serve(async (req) => {
       return new Response("fixtureId is required", { status: 400 });
     }
 
-    console.log(`📡 Fetching details for Fixture ID: ${fixtureId}`);
-
+    console.log(`📡 [fixtures-every5min] Checking details for Fixture ID: ${fixtureId}`);
+    
     // 1. APIから特定の試合詳細（スコア + イベント入り）を取得
     const response = await fetch(
       `https://v3.football.api-sports.io/fixtures?id=${fixtureId}`,
