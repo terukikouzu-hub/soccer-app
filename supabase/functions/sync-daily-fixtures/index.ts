@@ -86,7 +86,7 @@ Deno.serve(async (_req) => {
       );
 
       if (filtered.length > 0) {
-        // --- ✨ [追加機能] チーム情報を抽出して保存 ---
+        // --- チーム情報を抽出して保存 ---
         const teamsMap = new Map();
         filtered.forEach((f: any) => {
           // ホームチーム
@@ -104,6 +104,10 @@ Deno.serve(async (_req) => {
           syncedLeagues.add(f.league.name);
         });
         const teamsToUpsert = Array.from(teamsMap.values());
+        if (teamsToUpsert.length > 0) {
+          const teamNames = teamsToUpsert.map(t => t.name).join(", ");
+          console.log(`📝 [Teams Sync] Saving ${teamsToUpsert.length} teams for ${dateString}: ${teamNames}`);
+        }
         const { error: teamError } = await supabase.from("teams").upsert(teamsToUpsert);
         if (teamError) console.error("⚠️ Team sync error:", teamError.message);
         totalTeamsSynced += teamsToUpsert.length;
