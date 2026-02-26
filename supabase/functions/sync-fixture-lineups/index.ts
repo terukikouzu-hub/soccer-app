@@ -1,10 +1,11 @@
+// Supabase Edge Function: sync-fixture-lineups
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 
 const API_KEY = Deno.env.get("API_FOOTBALL_KEY")!;
 
 Deno.serve(async (req) => {
-  // ★ 改善1: 関数の入り口で真っ先にログを出す（これで「届いているか」がわかる）
-  console.log(`--- Function triggered: ${new Date().toISOString()} ---`);
+  const timestamp = new Date().toISOString();
+  console.log(`--- [Worker] Lineup Sync Started: ${timestamp} ---`);
 
   try {
     const supabase = createClient(
@@ -12,62 +13,32 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // ★ 改善2: req.json() のエラーで関数が落ちるのを防ぐ
-    // net.http_post は空の body を送ることがあり、その場合 req.json() はクラッシュします
+    // 1. リクエストボディの解析
     let body: any = {};
     try {
       const text = await req.text();
       body = text ? JSON.parse(text) : {};
     } catch (e) {
-      console.log("📝 No valid JSON body found, proceeding with empty object.");
+      console.log("📝 [Worker] Request body is empty or invalid JSON.");
     }
 
-    let targetFixtureIds: number[] = body.fixtureId ? [body.fixtureId] : [];
+    // 2. 処理対象 ID の確定（Manager からの指示を優先）
+    const targetFixtureIds: number[] = Array.isArray(body.fixtureIds) 
+      ? body.fixtureIds 
+      : body.fixtureId ? [body.fixtureId] : [];
 
     if (targetFixtureIds.length === 0) {
-      const now = new Date();
-      const lowerBound = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
-      const upperBound = new Date(now.getTime() + 30 * 60 * 1000).toISOString();
-
-      console.log(`🔍 Scanning DB for matches between: ${lowerBound} and ${upperBound}`);
-
-      const { data: fixtures, error: fError } = await supabase
-        .from("fixtures")
-        .select("id")
-        .gte("event_date", lowerBound)
-        .lte("event_date", upperBound);
-
-      if (fError) throw fError;
-
-      // 試合がない場合はここで終了（理由をログに残す）
-      if (!fixtures || fixtures.length === 0) {
-        console.log("ℹ️ No matches found in the time range. Ending process.");
-        return new Response(JSON.stringify({ message: "No upcoming matches found in DB." }), { status: 200 });
-      }
-
-      const foundIds = fixtures.map((f) => f.id);
-      console.log(`📡 Matches found in range: ${foundIds.join(", ")}`);
-
-      const { data: existingLineups, error: lError } = await supabase
-        .from("fixture_lineups")
-        .select("fixture_id")
-        .in("fixture_id", foundIds);
-
-      if (lError) throw lError;
-
-      const syncedIds = existingLineups?.map((l) => l.fixture_id) || [];
-      targetFixtureIds = foundIds.filter((id) => !syncedIds.includes(id));
-
-      if (targetFixtureIds.length === 0) {
-        console.log("✅ All matches are already synced. Nothing to do.");
-        return new Response(JSON.stringify({ message: "All upcoming matches are already synced." }), { status: 200 });
-      }
+      console.log("ℹ️ [Worker] No Fixture IDs provided. Ending process.");
+      return new Response(JSON.stringify({ synced_ids: [], message: "No IDs provided" }), { status: 200 });
     }
 
-    console.log(`🚀 Syncing ${targetFixtureIds.length} matches: ${targetFixtureIds.join(", ")}`);
+    console.log(`🚀 [Worker] Processing ${targetFixtureIds.length} matches: ${targetFixtureIds.join(", ")}`);
 
-    const results = [];
+    const results: number[] = [];
+
     for (const id of targetFixtureIds) {
+      console.log(`📡 [Worker] [ID:${id}] Fetching API...`);
+      
       const response = await fetch(
         `https://v3.football.api-sports.io/fixtures/lineups?fixture=${id}`,
         {
@@ -79,39 +50,91 @@ Deno.serve(async (req) => {
       );
 
       const resJson = await response.json();
-      const lineups = resJson.response;
+      const lineups = resJson.response; // lineups[0]がホーム、lineups[1]がアウェイ
 
       if (!lineups || lineups.length === 0) {
-        console.log(`⚠️ Lineups not yet available from API for ID: ${id}`);
+        console.log(`⚠️ [Worker] [ID:${id}] Lineups not yet available from API.`);
         continue;
       }
 
-      const upsertData = lineups.map((l: any) => ({
-        fixture_id: id,
-        team_id: l.team.id,
-        formation: l.formation,
-        start_xi: l.startXI,
-        substitutes: l.substitutes,
-        coach: l.coach
-      }));
+      for (const teamData of lineups) {
+        const teamId = teamData.team.id;
 
-      const { error: upsertError } = await supabase
-        .from("fixture_lineups")
-        .upsert(upsertData, { onConflict: "fixture_id, team_id" });
+        // A. チーム単位の情報を保存 (fixture_lineups_teams)
+        const { error: teamError } = await supabase
+          .from("fixture_lineups_teams")
+          .upsert({
+            fixture_id: id,
+            team_id: teamId,
+            formation: teamData.formation,
+            coach: teamData.coach?.name || null
+          }, { onConflict: "fixture_id, team_id" });
 
-      if (upsertError) {
-        console.error(`❌ DB Upsert Error for ID ${id}:`, upsertError.message);
-      } else {
-        console.log(`✅ Successfully saved lineups for ID: ${id}`);
-        results.push(id);
+        if (teamError) {
+          console.error(`❌ [Worker] [ID:${id}] Team Upsert Error:`, teamError.message);
+          continue;
+        }
+
+        // B. 選手リストの整形（Start XI と Substitutes を統合）
+        const allPlayers = [
+          ...teamData.startXI.map((p: any) => ({ ...p, is_start: true })),
+          ...teamData.substitutes.map((p: any) => ({ ...p, is_start: false }))
+        ];
+
+        // C. 未知の選手を player_details に登録
+        const playerIds = allPlayers.map(p => p.player.id);
+        const { data: existingPlayers } = await supabase
+          .from("player_details")
+          .select("id")
+          .in("id", playerIds);
+        
+        const existingIds = existingPlayers?.map(p => p.id) || [];
+        const newPlayers = allPlayers
+          .filter(p => !existingIds.includes(p.player.id))
+          .map(p => ({
+            id: p.player.id,
+            name: p.player.name,
+            // 必要に応じて photo などのカラムも追加可能
+          }));
+
+        if (newPlayers.length > 0) {
+          const { error: pDetailError } = await supabase
+            .from("player_details")
+            .upsert(newPlayers, { onConflict: "id" });
+          
+          if (!pDetailError) {
+            console.log(`👤 [Worker] [ID:${id}] Registered ${newPlayers.length} new players to player_details.`);
+          }
+        }
+
+        // D. 選手情報を保存 (fixture_lineup_players)
+        const playersUpsertData = allPlayers.map((p: any) => ({
+          fixture_id: id,
+          team_id: teamId,
+          player_id: p.player.id,
+          number: p.player.number,
+          pos: p.player.pos,
+          grid: p.player.grid,
+          is_start: p.is_start
+        }));
+
+        const { error: playersError } = await supabase
+          .from("fixture_lineup_players")
+          .upsert(playersUpsertData, { onConflict: "fixture_id, player_id" });
+
+        if (playersError) {
+          console.error(`❌ [Worker] [ID:${id}] Players Upsert Error:`, playersError.message);
+        }
       }
+
+      console.log(`✅ [Worker] [ID:${id}] Sync complete (Teams & Players).`);
+      results.push(id);
     }
 
     return new Response(JSON.stringify({ synced_ids: results }), { status: 200 });
 
   } catch (err: any) {
-    // ここでエラーが出た場合も確実にログに残す
-    console.error("❌ Critical Error in Edge Function:", err.message);
+    console.error("❌ [Worker] Critical Error:", err.message);
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 });
