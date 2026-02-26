@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
 
       console.log(`📊 [Manager] Found ${liveFixtures.length} matches. Breakdown: ${summaryLog}`);
 
-      // 3. 20件ずつの塊（バッチ）にして Worker 関数を呼び出す (既存処理)
+      // 3. 20件ずつの塊（バッチ）にして Worker(sync-fixture-every5min) を呼び出す (既存処理)
       const allIds = liveFixtures.map(f => f.id);
       const workerUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/sync-fixture-every5min`;
       let triggeredBatches = 0;
