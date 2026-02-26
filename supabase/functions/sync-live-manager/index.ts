@@ -10,7 +10,7 @@ Deno.serve(async (req) => {
   console.log(`🚀 [Manager] Starting scan: ${new Date().toISOString()}`);
 
   try {
-    // 1. ライブ中または開始時間を過ぎた未終了の試合を抽出
+    // ライブ中または開始時間を過ぎた未終了の試合を抽出
     // ステータス: 1H, HT, 2H, ET, BT, P, SUSP, INT, NS(開始予定) など
     const { data: liveFixtures, error: fetchError } = await supabase
       .from("fixtures")
@@ -19,29 +19,6 @@ Deno.serve(async (req) => {
       .lte("event_date", new Date().toISOString());
 
     if (fetchError) throw fetchError;
-
-    // --- ラインナップ取得が必要な試合を抽出 ---
-    const now = new Date();
-    const lineupStart = new Date(now.getTime() - 30 * 60 * 1000).toISOString(); // 30分前
-    const lineupEnd = new Date(now.getTime() + 50 * 60 * 1000).toISOString();  // 50分後
-    
-    const { data: potentialLineups } = await supabase
-      .from("fixtures")
-      .select("id, event_date")
-      .gte("event_date", lineupStart)
-      .lte("event_date", lineupEnd);
-
-    const pIds = potentialLineups?.map(m => m.id) || [];
-
-    console.log(`🔍 [Debug] Matches in time range (T-30 to T+50): ${pIds.length} found.`);
-
-    const { data: existing } = await supabase
-      .from("fixture_lineup_teams")
-      .select("fixture_id")
-      .in("fixture_id", pIds);
-    
-    const existingIds = existing?.map(e => e.fixture_id) || [];
-    const neededLineupIds = pIds.filter(id => !existingIds.includes(id));
 
     // --- 試合後統計取得が必要な試合を抽出 ---
     const { data: finishedFixtures, error: statsFetchError } = await supabase
@@ -53,18 +30,16 @@ Deno.serve(async (req) => {
 
       if (statsFetchError) throw statsFetchError;
     const statsNeededIds = finishedFixtures?.map(f => f.id) || [];
-    // ------------------------------------------
 
     // タスクがない場合のみ早期終了
-    if ((!liveFixtures || liveFixtures.length === 0) && neededLineupIds.length === 0 && statsNeededIds.length === 0) {
-      console.log("ℹ️ [Manager] No tasks (Live/Lineup/Stats) found in database.");
+    if ((!liveFixtures || liveFixtures.length === 0) && statsNeededIds.length === 0) {
+      console.log("ℹ️ [Manager] No tasks (Live/Stats) found in database.");
       return new Response(JSON.stringify({ message: "No matches to process" }), { status: 200 });
     }
 
     // 2. ステータス別の内訳を集計してログ出力 (既存処理)
-    let statusSummary = {};
     if (liveFixtures && liveFixtures.length > 0) {
-      statusSummary = liveFixtures.reduce((acc: Record<string, number>, curr) => {
+      const statusSummary = liveFixtures.reduce((acc: Record<string, number>, curr) => {
         const status = curr.status_short || "UNKNOWN";
         acc[status] = (acc[status] || 0) + 1;
         return acc;
@@ -76,7 +51,7 @@ Deno.serve(async (req) => {
 
       console.log(`📊 [Manager] Found ${liveFixtures.length} matches. Breakdown: ${summaryLog}`);
 
-      // 3. 20件ずつの塊（バッチ）にして Worker 関数を呼び出す (既存処理)
+      // 3. 20件ずつの塊にして Worker(sync-fixture-every5min) 関数を呼び出す (既存処理)
       const allIds = liveFixtures.map(f => f.id);
       const workerUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/sync-fixture-every5min`;
       let triggeredBatches = 0;
@@ -106,35 +81,6 @@ Deno.serve(async (req) => {
     } else {
       // ライブ試合がない場合は元のログを出力
       console.log("ℹ️ [Manager] No live matches found in database.");
-    }
-
-    // --- ラインナップ (sync-fixture-lineups) の呼び出しと詳細ログ ---
-    let lineupReport: { success: number[], failed: number[] } = { success: [], failed: [] };
-    if (neededLineupIds.length > 0) {
-      console.log(`📋 [Manager] Attempting lineups for ${neededLineupIds.length} matches: ${neededLineupIds.join(", ")}`);
-
-      const lineupWorkerUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/sync-fixture-lineups`;
-      const lineupRes = await fetch(lineupWorkerUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-        },
-        body: JSON.stringify({ fixtureIds: neededLineupIds }),
-      });
-
-      if (lineupRes.ok) {
-        const resData = await lineupRes.json();
-        const syncedIds = resData.synced_ids || [];
-        lineupReport.success = syncedIds;
-        lineupReport.failed = neededLineupIds.filter(id => !syncedIds.includes(id));
-
-        console.log(`✅ [Manager] Lineup Sync Complete.`);
-        console.log(`   - Successfully Synced (${lineupReport.success.length}): ${lineupReport.success.join(", ") || "None"}`);
-        console.log(`   - Not Found/Failed (${lineupReport.failed.length}): ${lineupReport.failed.join(", ") || "None"}`);
-      } else {
-        console.error(`⚠️ [Manager] Lineup Worker failed: ${lineupRes.status}`);
-      }
     }
 
     // --- 試合後統計 (sync-fixture-data) の呼び出し ---
@@ -177,10 +123,6 @@ Deno.serve(async (req) => {
       JSON.stringify({
         status: "success",
         live_count: liveFixtures?.length || 0,
-        lineup_sync: {
-          attempted: neededLineupIds.length,
-          synced: lineupReport.success.length
-        },
         stats_sync: {
           attempted: statsNeededIds.length,
           completed: statsSuccessCount
