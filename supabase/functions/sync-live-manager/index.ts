@@ -15,7 +15,8 @@ Deno.serve(async (req) => {
     const { data: liveFixtures, error: fetchError } = await supabase
       .from("fixtures")
       .select("id, status_short")
-      .not("status_short", "in", '("FT","AET","PEN","PST","CANC")')// 終了系(FT, AET, PEN)や中止(PST, CANC)を除外
+      // 終了や中止を除外するのではなく、アクティブなステータスのみを指定
+      .in("status_short", ["1H", "HT", "2H", "ET", "BT", "P", "SUSP", "INT", "LIVE"])
       .lte("event_date", new Date().toISOString());
 
     if (fetchError) throw fetchError;

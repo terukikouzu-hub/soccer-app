@@ -60,9 +60,9 @@ Deno.serve(async (req) => {
       for (const teamData of lineups) {
         const teamId = teamData.team.id;
 
-        // A. チーム単位の情報を保存 (fixture_lineups_teams)
+        // A. チーム単位の情報を保存 (fixture_lineup_teams)
         const { error: teamError } = await supabase
-          .from("fixture_lineups_teams")
+          .from("fixture_lineup_teams")
           .upsert({
             fixture_id: id,
             team_id: teamId,

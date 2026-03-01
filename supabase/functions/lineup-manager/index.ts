@@ -16,7 +16,7 @@ Deno.serve(async (req) => {
     // 1. 開始10分後までの試合を拾う (now - 10分)
     const lineupStart = new Date(now.getTime() - 10 * 60 * 1000).toISOString(); 
     // 2. 開始60分前からの試合を拾う (now + 60分)
-    const lineupEnd = new Date(now.getTime() + 60 * 60 * 1000).toISOString(); 
+    const lineupEnd = new Date(now.getTime() + 30 * 60 * 1000).toISOString(); 
     
     console.log(`🔍 [LineupManager] Searching for matches between ${lineupStart} and ${lineupEnd}`);
 
