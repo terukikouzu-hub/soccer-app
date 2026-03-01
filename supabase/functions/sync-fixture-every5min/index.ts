@@ -36,9 +36,14 @@ Deno.serve(async (req) => {
     const batchData = resJson.response;
 
     if (!batchData || batchData.length === 0) {
-      console.error(`⚠️ [fixture-every5min] No data found for IDs: ${idsParam}`);
-      return new Response(JSON.stringify({ error: "Fixtures not found" }), {
-        status: 404,
+      // 404 ではなく 200 (OK) を返し、Managerを安心させる
+      console.warn(`ℹ️ [fixture-every5min] No live data from API for IDs: ${idsParam}`);
+      return new Response(JSON.stringify({ 
+        message: "No updates found for these IDs",
+        synced_count: 0 
+      }), { 
+        status: 200, // ここを200にする
+        headers: { "Content-Type": "application/json" } 
       });
     }
 
