@@ -1,3 +1,4 @@
+//supabase/functions/sync-fixture-liveupdate/index.ts
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.7";
 
 const API_KEY = Deno.env.get("API_FOOTBALL_KEY")!;

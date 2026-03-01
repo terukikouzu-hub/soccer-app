@@ -52,9 +52,9 @@ Deno.serve(async (req) => {
 
       console.log(`📊 [Manager] Found ${liveFixtures.length} matches. Breakdown: ${summaryLog}`);
 
-      // 3. 20件ずつの塊にして Worker(sync-fixture-every5min) 関数を呼び出す (既存処理)
+      // 3. 20件ずつの塊にして Worker(sync-fixture-liveupdate) 関数を呼び出す (既存処理)
       const allIds = liveFixtures.map(f => f.id);
-      const workerUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/sync-fixture-every5min`;
+      const workerUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/sync-fixture-liveupdate`;
       let triggeredBatches = 0;
 
       for (let i = 0; i < allIds.length; i += 20) {
